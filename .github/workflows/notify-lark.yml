@@ -1,0 +1,91 @@
+name: Notify Lark on CV commit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cv/latest.json'      # chỉ chạy khi file CV thay đổi
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read CV data
+        id: cv
+        run: |
+          echo "ho_ten=$(jq -r '.ho_ten' cv/latest.json)"                     >> $GITHUB_OUTPUT
+          echo "role=$(jq -r '.role' cv/latest.json)"                         >> $GITHUB_OUTPUT
+          echo "score=$(jq -r '.total_score_display' cv/latest.json)"         >> $GITHUB_OUTPUT
+          echo "verdict=$(jq -r '.overall_verdict' cv/latest.json)"           >> $GITHUB_OUTPUT
+          echo "phone=$(jq -r '.so_dien_thoai' cv/latest.json)"               >> $GITHUB_OUTPUT
+          echo "email=$(jq -r '.email' cv/latest.json)"                       >> $GITHUB_OUTPUT
+          # overview có xuống dòng → escape để nhét vào JSON
+          echo "overview<<EOF"                                                 >> $GITHUB_OUTPUT
+          jq -r '.overview' cv/latest.json                                     >> $GITHUB_OUTPUT
+          echo "EOF"                                                           >> $GITHUB_OUTPUT
+
+      - name: Get tenant_access_token
+        id: token
+        run: |
+          TOKEN=$(curl -s -X POST \
+            https://open.larksuite.com/open-apis/auth/v3/tenant_access_token/internal \
+            -H "Content-Type: application/json" \
+            -d "{\"app_id\":\"${{ secrets.LARK_APP_ID }}\",\"app_secret\":\"${{ secrets.LARK_APP_SECRET }}\"}" \
+            | jq -r '.tenant_access_token')
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Send Lark card
+        run: |
+          # màu header theo verdict
+          VERDICT="${{ steps.cv.outputs.verdict }}"
+          if [ "$VERDICT" = "Strong" ]; then TEMPLATE="green";
+          elif [ "$VERDICT" = "Considerable" ]; then TEMPLATE="orange";
+          else TEMPLATE="red"; fi
+
+          CARD=$(jq -n \
+            --arg ho_ten "${{ steps.cv.outputs.ho_ten }}" \
+            --arg role "${{ steps.cv.outputs.role }}" \
+            --arg score "${{ steps.cv.outputs.score }}" \
+            --arg verdict "$VERDICT" \
+            --arg phone "${{ steps.cv.outputs.phone }}" \
+            --arg email "${{ steps.cv.outputs.email }}" \
+            --arg overview "${{ steps.cv.outputs.overview }}" \
+            --arg template "$TEMPLATE" \
+            '{
+              config: { wide_screen_mode: true },
+              header: {
+                template: $template,
+                title: { tag: "plain_text", content: ("🗂 CV mới: " + $ho_ten) }
+              },
+              elements: [
+                { tag: "div", text: { tag: "lark_md",
+                  content: ("**Vị trí ứng tuyển**\n" + $role) } },
+                { tag: "hr" },
+                { tag: "div", fields: [
+                  { is_short: true, text: { tag: "lark_md",
+                    content: ("**Điểm tổng**\n" + $score) } },
+                  { is_short: true, text: { tag: "lark_md",
+                    content: ("**Đánh giá**\n" + $verdict) } }
+                ] },
+                { tag: "hr" },
+                { tag: "div", fields: [
+                  { is_short: true, text: { tag: "lark_md",
+                    content: ("**SĐT**\n" + $phone) } },
+                  { is_short: true, text: { tag: "lark_md",
+                    content: ("**Email**\n" + $email) } }
+                ] },
+                { tag: "hr" },
+                { tag: "div", text: { tag: "lark_md",
+                  content: ("**Tổng quan**\n" + $overview) } }
+              ]
+            }')
+
+          curl -s -X POST \
+            "https://open.larksuite.com/open-apis/im/v1/messages?receive_id_type=chat_id" \
+            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+            -H "Content-Type: application/json; charset=utf-8" \
+            -d "$(jq -n --arg rid "${{ secrets.LARK_CHAT_ID }}" --arg card "$CARD" \
+                  '{receive_id: $rid, msg_type: "interactive", content: $card}')"
