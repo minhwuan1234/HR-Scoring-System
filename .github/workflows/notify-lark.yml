@@ -37,8 +37,6 @@ jobs:
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
       - name: Send Lark card
-        env:
-          RECEIVE_ID: ou_f77cf794a1319628941dd689ecc97e32   # Minh Quân
         run: |
           VERDICT="${{ steps.cv.outputs.verdict }}"
           if [ "$VERDICT" = "Strong" ]; then TEMPLATE="green";
@@ -78,17 +76,25 @@ jobs:
               ]
             }')
 
-          RESP=$(curl -s -X POST \
-            "https://open.larksuite.com/open-apis/im/v1/messages?receive_id_type=open_id" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-            -H "Content-Type: application/json; charset=utf-8" \
-            -d "$(jq -n --arg rid "$RECEIVE_ID" --arg card "$CARD" \
-                  '{receive_id: $rid, msg_type: "interactive", content: $card}')")
+          # Danh sách open_id người nhận
+          RECEIVERS="ou_f77cf794a1319628941dd689ecc97e32 ou_4eb96bd84a22b6511fcb316d35ded621 ou_9f7de713af63322b36ee7e41f5731313"
 
-          echo "Lark response: $RESP"
-          # fail step nếu Lark trả code khác 0
-          CODE=$(echo "$RESP" | jq -r '.code')
-          if [ "$CODE" != "0" ]; then
-            echo "❌ Lark API lỗi (code=$CODE)"; exit 1
-          fi
-          echo "✅ Đã gửi card tới Minh Quân"
+          FAIL=0
+          for RID in $RECEIVERS; do
+            RESP=$(curl -s -X POST \
+              "https://open.larksuite.com/open-apis/im/v1/messages?receive_id_type=open_id" \
+              -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
+              -H "Content-Type: application/json; charset=utf-8" \
+              -d "$(jq -n --arg rid "$RID" --arg card "$CARD" \
+                    '{receive_id: $rid, msg_type: "interactive", content: $card}')")
+            CODE=$(echo "$RESP" | jq -r '.code')
+            if [ "$CODE" = "0" ]; then
+              echo "✅ Gửi thành công tới $RID"
+            else
+              echo "❌ Lỗi tới $RID: $RESP"
+              FAIL=1
+            fi
+          done
+
+          if [ "$FAIL" = "1" ]; then exit 1; fi
+          echo "✅ Hoàn tất gửi cho toàn bộ người nhận"
