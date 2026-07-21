@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'cv/latest.json'      # chỉ chạy khi file CV thay đổi
+      - 'cv/latest.json'
 
 jobs:
   notify:
@@ -16,16 +16,15 @@ jobs:
       - name: Read CV data
         id: cv
         run: |
-          echo "ho_ten=$(jq -r '.ho_ten' cv/latest.json)"                     >> $GITHUB_OUTPUT
-          echo "role=$(jq -r '.role' cv/latest.json)"                         >> $GITHUB_OUTPUT
-          echo "score=$(jq -r '.total_score_display' cv/latest.json)"         >> $GITHUB_OUTPUT
-          echo "verdict=$(jq -r '.overall_verdict' cv/latest.json)"           >> $GITHUB_OUTPUT
-          echo "phone=$(jq -r '.so_dien_thoai' cv/latest.json)"               >> $GITHUB_OUTPUT
-          echo "email=$(jq -r '.email' cv/latest.json)"                       >> $GITHUB_OUTPUT
-          # overview có xuống dòng → escape để nhét vào JSON
-          echo "overview<<EOF"                                                 >> $GITHUB_OUTPUT
-          jq -r '.overview' cv/latest.json                                     >> $GITHUB_OUTPUT
-          echo "EOF"                                                           >> $GITHUB_OUTPUT
+          echo "ho_ten=$(jq -r '.ho_ten' cv/latest.json)"             >> $GITHUB_OUTPUT
+          echo "role=$(jq -r '.role' cv/latest.json)"                 >> $GITHUB_OUTPUT
+          echo "score=$(jq -r '.total_score_display' cv/latest.json)" >> $GITHUB_OUTPUT
+          echo "verdict=$(jq -r '.overall_verdict' cv/latest.json)"   >> $GITHUB_OUTPUT
+          echo "phone=$(jq -r '.so_dien_thoai' cv/latest.json)"       >> $GITHUB_OUTPUT
+          echo "email=$(jq -r '.email' cv/latest.json)"               >> $GITHUB_OUTPUT
+          echo "overview<<EOF"                                        >> $GITHUB_OUTPUT
+          jq -r '.overview' cv/latest.json                            >> $GITHUB_OUTPUT
+          echo "EOF"                                                  >> $GITHUB_OUTPUT
 
       - name: Get tenant_access_token
         id: token
@@ -38,8 +37,9 @@ jobs:
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
       - name: Send Lark card
+        env:
+          RECEIVE_ID: ou_f77cf794a1319628941dd689ecc97e32   # Minh Quân
         run: |
-          # màu header theo verdict
           VERDICT="${{ steps.cv.outputs.verdict }}"
           if [ "$VERDICT" = "Strong" ]; then TEMPLATE="green";
           elif [ "$VERDICT" = "Considerable" ]; then TEMPLATE="orange";
@@ -65,27 +65,30 @@ jobs:
                   content: ("**Vị trí ứng tuyển**\n" + $role) } },
                 { tag: "hr" },
                 { tag: "div", fields: [
-                  { is_short: true, text: { tag: "lark_md",
-                    content: ("**Điểm tổng**\n" + $score) } },
-                  { is_short: true, text: { tag: "lark_md",
-                    content: ("**Đánh giá**\n" + $verdict) } }
+                  { is_short: true, text: { tag: "lark_md", content: ("**Điểm tổng**\n" + $score) } },
+                  { is_short: true, text: { tag: "lark_md", content: ("**Đánh giá**\n" + $verdict) } }
                 ] },
                 { tag: "hr" },
                 { tag: "div", fields: [
-                  { is_short: true, text: { tag: "lark_md",
-                    content: ("**SĐT**\n" + $phone) } },
-                  { is_short: true, text: { tag: "lark_md",
-                    content: ("**Email**\n" + $email) } }
+                  { is_short: true, text: { tag: "lark_md", content: ("**SĐT**\n" + $phone) } },
+                  { is_short: true, text: { tag: "lark_md", content: ("**Email**\n" + $email) } }
                 ] },
                 { tag: "hr" },
-                { tag: "div", text: { tag: "lark_md",
-                  content: ("**Tổng quan**\n" + $overview) } }
+                { tag: "div", text: { tag: "lark_md", content: ("**Tổng quan**\n" + $overview) } }
               ]
             }')
 
-          curl -s -X POST \
-            "https://open.larksuite.com/open-apis/im/v1/messages?receive_id_type=chat_id" \
+          RESP=$(curl -s -X POST \
+            "https://open.larksuite.com/open-apis/im/v1/messages?receive_id_type=open_id" \
             -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
             -H "Content-Type: application/json; charset=utf-8" \
-            -d "$(jq -n --arg rid "${{ secrets.LARK_CHAT_ID }}" --arg card "$CARD" \
-                  '{receive_id: $rid, msg_type: "interactive", content: $card}')"
+            -d "$(jq -n --arg rid "$RECEIVE_ID" --arg card "$CARD" \
+                  '{receive_id: $rid, msg_type: "interactive", content: $card}')")
+
+          echo "Lark response: $RESP"
+          # fail step nếu Lark trả code khác 0
+          CODE=$(echo "$RESP" | jq -r '.code')
+          if [ "$CODE" != "0" ]; then
+            echo "❌ Lark API lỗi (code=$CODE)"; exit 1
+          fi
+          echo "✅ Đã gửi card tới Minh Quân"
