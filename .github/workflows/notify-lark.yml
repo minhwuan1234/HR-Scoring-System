@@ -1,6 +1,12 @@
 name: Notify Lark
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "cv/latest.json"
+
   workflow_dispatch:
 
 jobs:
@@ -8,63 +14,120 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Get Lark Access Token
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read CV data
+        id: cv
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          FILE="cv/latest.json"
+
+          if [[ ! -f "$FILE" ]]; then
+            echo "❌ Không tìm thấy $FILE"
+            exit 1
+          fi
+
+          if ! jq empty "$FILE"; then
+            echo "❌ File $FILE không phải JSON hợp lệ"
+            exit 1
+          fi
+
+          SCORE="$(jq -r '.total_score_display // empty' "$FILE")"
+          VERDICT="$(jq -r '.overall_verdict // empty' "$FILE")"
+          HO_TEN="$(jq -r '.ho_ten // empty' "$FILE")"
+          PHONE="$(jq -r '.so_dien_thoai // empty' "$FILE")"
+          EMAIL="$(jq -r '.email // empty' "$FILE")"
+          ROLE="$(jq -r '.role // empty' "$FILE")"
+          OVERVIEW="$(jq -r '.overview // empty' "$FILE")"
+          CV_URL="$(jq -r '.URL // .url // empty' "$FILE")"
+
+          if [[ -z "$HO_TEN" ]]; then
+            echo "❌ Thiếu ho_ten trong $FILE"
+            exit 1
+          fi
+
+          {
+            echo "score=$SCORE"
+            echo "verdict=$VERDICT"
+            echo "ho_ten=$HO_TEN"
+            echo "phone=$PHONE"
+            echo "email=$EMAIL"
+            echo "role=$ROLE"
+            echo "url=$CV_URL"
+
+            echo "overview<<EOF"
+            echo "$OVERVIEW"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "✅ Đã đọc dữ liệu CV của: $HO_TEN"
+
+      - name: Get Lark access token
         id: token
         env:
           LARK_APP_ID: ${{ secrets.LARK_APP_ID }}
           LARK_APP_SECRET: ${{ secrets.LARK_APP_SECRET }}
+        shell: bash
         run: |
           set -euo pipefail
+
+          if [[ -z "${LARK_APP_ID:-}" ]]; then
+            echo "❌ Thiếu GitHub secret LARK_APP_ID"
+            exit 1
+          fi
+
+          if [[ -z "${LARK_APP_SECRET:-}" ]]; then
+            echo "❌ Thiếu GitHub secret LARK_APP_SECRET"
+            exit 1
+          fi
 
           RESPONSE="$(
             curl --silent --show-error \
               --request POST \
               "https://open.larksuite.com/open-apis/auth/v3/tenant_access_token/internal" \
               --header "Content-Type: application/json; charset=utf-8" \
-              --data "$(jq -nc \
-                --arg app_id "$LARK_APP_ID" \
-                --arg app_secret "$LARK_APP_SECRET" \
-                '{
-                  app_id: $app_id,
-                  app_secret: $app_secret
-                }'
+              --data "$(
+                jq -nc \
+                  --arg app_id "$LARK_APP_ID" \
+                  --arg app_secret "$LARK_APP_SECRET" \
+                  '{
+                    app_id: $app_id,
+                    app_secret: $app_secret
+                  }'
               )"
           )"
 
-          echo "$RESPONSE" | jq .
-
-          CODE="$(echo "$RESPONSE" | jq -r '.code // -1')"
-          TOKEN="$(echo "$RESPONSE" | jq -r '.tenant_access_token // empty')"
+          CODE="$(jq -r '.code // -1' <<< "$RESPONSE")"
+          TOKEN="$(jq -r '.tenant_access_token // empty' <<< "$RESPONSE")"
 
           if [[ "$CODE" != "0" || -z "$TOKEN" ]]; then
-            echo "❌ Không lấy được Lark tenant access token."
+            echo "❌ Không lấy được Lark access token"
+            echo "$RESPONSE" | jq . || echo "$RESPONSE"
             exit 1
           fi
 
           echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+          echo "✅ Đã lấy Lark access token"
 
       - name: Send Lark Card
         env:
           LARK_TOKEN: ${{ steps.token.outputs.token }}
-
-          VERDICT: Strong
-          HO_TEN: Nguyễn Văn A
-          ROLE: Designer
-          SCORE: "85"
-          PHONE: "0123456789"
-          EMAIL: candidate@example.com
-          OVERVIEW: Ứng viên có kinh nghiệm phù hợp với vị trí.
-          CV_URL: https://drive.google.com/
+          VERDICT: ${{ steps.cv.outputs.verdict }}
+          HO_TEN: ${{ steps.cv.outputs.ho_ten }}
+          ROLE: ${{ steps.cv.outputs.role }}
+          SCORE: ${{ steps.cv.outputs.score }}
+          PHONE: ${{ steps.cv.outputs.phone }}
+          EMAIL: ${{ steps.cv.outputs.email }}
+          OVERVIEW: ${{ steps.cv.outputs.overview }}
+          CV_URL: ${{ steps.cv.outputs.url }}
 
         shell: bash
 
         run: |
           set -euo pipefail
-
-          if [[ -z "${LARK_TOKEN:-}" ]]; then
-            echo "❌ LARK_TOKEN đang rỗng."
-            exit 1
-          fi
 
           case "$VERDICT" in
             "Strong")
@@ -75,9 +138,13 @@ jobs:
               TEMPLATE="orange"
               ICON="🟡"
               ;;
-            *)
+            "Weak")
               TEMPLATE="red"
               ICON="🔴"
+              ;;
+            *)
+              TEMPLATE="grey"
+              ICON="⚪"
               ;;
           esac
 
@@ -213,7 +280,7 @@ jobs:
                 }'
             )"
 
-            RESP="$(
+            RESPONSE="$(
               curl --silent --show-error \
                 --request POST \
                 "https://open.larksuite.com/open-apis/im/v1/messages?receive_id_type=open_id" \
@@ -222,18 +289,19 @@ jobs:
                 --data "$PAYLOAD"
             )"
 
-            CODE="$(echo "$RESP" | jq -r '.code // -1')"
+            CODE="$(jq -r '.code // -1' <<< "$RESPONSE")"
 
             if [[ "$CODE" == "0" ]]; then
               echo "✅ Sent to $RID"
             else
               echo "❌ Failed to $RID"
-              echo "$RESP" | jq . || echo "$RESP"
+              echo "$RESPONSE" | jq . || echo "$RESPONSE"
               FAIL=1
             fi
           done
 
           if [[ "$FAIL" -eq 1 ]]; then
+            echo "❌ One or more notifications failed."
             exit 1
           fi
 
