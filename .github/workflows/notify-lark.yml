@@ -26,7 +26,7 @@ jobs:
           FILE="cv/latest.json"
 
           if [[ ! -f "$FILE" ]]; then
-            echo "❌ Không tìm thấy $FILE"
+            echo "❌ Không tìm thấy file $FILE"
             exit 1
           fi
 
@@ -35,35 +35,134 @@ jobs:
             exit 1
           fi
 
-          SCORE="$(jq -r '.total_score_display // empty' "$FILE")"
-          VERDICT="$(jq -r '.overall_verdict // empty' "$FILE")"
-          HO_TEN="$(jq -r '.ho_ten // empty' "$FILE")"
-          PHONE="$(jq -r '.so_dien_thoai // empty' "$FILE")"
-          EMAIL="$(jq -r '.email // empty' "$FILE")"
-          ROLE="$(jq -r '.role // empty' "$FILE")"
-          OVERVIEW="$(jq -r '.overview // empty' "$FILE")"
-          CV_URL="$(jq -r '.URL // .url // empty' "$FILE")"
+          DATA_TYPE="$(jq -r 'type' "$FILE")"
 
-          if [[ -z "$HO_TEN" ]]; then
-            echo "❌ Thiếu ho_ten trong $FILE"
+          if [[ "$DATA_TYPE" == "array" ]]; then
+            ITEM_COUNT="$(jq 'length' "$FILE")"
+
+            if [[ "$ITEM_COUNT" -eq 0 ]]; then
+              echo "❌ File $FILE là array rỗng"
+              exit 1
+            fi
+
+            ROOT='.[0]'
+          elif [[ "$DATA_TYPE" == "object" ]]; then
+            ROOT='.'
+          else
+            echo "❌ JSON phải là object hoặc array chứa object"
             exit 1
           fi
 
-          {
-            echo "score=$SCORE"
-            echo "verdict=$VERDICT"
-            echo "ho_ten=$HO_TEN"
-            echo "phone=$PHONE"
-            echo "email=$EMAIL"
-            echo "role=$ROLE"
-            echo "url=$CV_URL"
+          HO_TEN="$(jq -r "$ROOT.ho_ten // $ROOT.name // empty" "$FILE")"
+          POSITION="$(jq -r "$ROOT.position // $ROOT.role // empty" "$FILE")"
+          SCORE="$(jq -r "$ROOT.total_score_display // $ROOT.score // empty" "$FILE")"
+          VERDICT="$(jq -r "$ROOT.overall_verdict // $ROOT.verdict // empty" "$FILE")"
+          PHONE="$(jq -r "$ROOT.so_dien_thoai // $ROOT.phone // empty" "$FILE")"
+          EMAIL="$(jq -r "$ROOT.email // empty" "$FILE")"
+          OVERVIEW="$(jq -r "$ROOT.overview // empty" "$FILE")"
+          CV_URL="$(jq -r "$ROOT.URL // $ROOT.url // empty" "$FILE")"
 
-            echo "overview<<EOF"
-            echo "$OVERVIEW"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+          ROW_A="$(jq -r "$ROOT.row_number_a // empty" "$FILE")"
+          DIMENSION_A="$(jq -r "$ROOT.dimension_a // empty" "$FILE")"
+          SCORE_A="$(jq -r "$ROOT.score_display_a // empty" "$FILE")"
+          REASON_A="$(jq -r "$ROOT.reason_a // empty" "$FILE")"
 
-          echo "✅ Đã đọc dữ liệu CV của: $HO_TEN"
+          ROW_B="$(jq -r "$ROOT.row_number_b // empty" "$FILE")"
+          DIMENSION_B="$(jq -r "$ROOT.dimension_b // empty" "$FILE")"
+          SCORE_B="$(jq -r "$ROOT.score_display_b // empty" "$FILE")"
+          REASON_B="$(jq -r "$ROOT.reason_b // empty" "$FILE")"
+
+          ROW_C="$(jq -r "$ROOT.row_number_c // empty" "$FILE")"
+          DIMENSION_C="$(jq -r "$ROOT.dimension_c // empty" "$FILE")"
+          SCORE_C="$(jq -r "$ROOT.score_display_c // empty" "$FILE")"
+          REASON_C="$(jq -r "$ROOT.reason_c // empty" "$FILE")"
+
+          ROW_D="$(jq -r "$ROOT.row_number_d // empty" "$FILE")"
+          DIMENSION_D="$(jq -r "$ROOT.dimension_d // empty" "$FILE")"
+          SCORE_D="$(jq -r "$ROOT.score_display_d // empty" "$FILE")"
+          REASON_D="$(jq -r "$ROOT.reason_d // empty" "$FILE")"
+
+          ROW_E="$(jq -r "$ROOT.row_number_e // empty" "$FILE")"
+          DIMENSION_E="$(jq -r "$ROOT.dimension_e // empty" "$FILE")"
+          SCORE_E="$(jq -r "$ROOT.score_display_e // empty" "$FILE")"
+          REASON_E="$(jq -r "$ROOT.reason_e // empty" "$FILE")"
+
+          ROW_F="$(jq -r "$ROOT.row_number_f // empty" "$FILE")"
+          DIMENSION_F="$(jq -r "$ROOT.dimension_f // empty" "$FILE")"
+          SCORE_F="$(jq -r "$ROOT.score_display_f // empty" "$FILE")"
+          REASON_F="$(jq -r "$ROOT.reason_f // empty" "$FILE")"
+
+          if [[ -z "$POSITION" ]]; then
+            echo "❌ Thiếu trường position hoặc role"
+            exit 1
+          fi
+
+          if [[ -z "$SCORE" ]]; then
+            echo "❌ Thiếu trường total_score_display"
+            exit 1
+          fi
+
+          if [[ -z "$VERDICT" ]]; then
+            echo "❌ Thiếu trường overall_verdict"
+            exit 1
+          fi
+
+          write_output() {
+            local key="$1"
+            local value="$2"
+            local delimiter="EOF_${key}_$(date +%s%N)"
+
+            {
+              echo "${key}<<${delimiter}"
+              echo "$value"
+              echo "${delimiter}"
+            } >> "$GITHUB_OUTPUT"
+          }
+
+          write_output "ho_ten" "$HO_TEN"
+          write_output "position" "$POSITION"
+          write_output "score" "$SCORE"
+          write_output "verdict" "$VERDICT"
+          write_output "phone" "$PHONE"
+          write_output "email" "$EMAIL"
+          write_output "overview" "$OVERVIEW"
+          write_output "url" "$CV_URL"
+
+          write_output "row_a" "$ROW_A"
+          write_output "dimension_a" "$DIMENSION_A"
+          write_output "score_a" "$SCORE_A"
+          write_output "reason_a" "$REASON_A"
+
+          write_output "row_b" "$ROW_B"
+          write_output "dimension_b" "$DIMENSION_B"
+          write_output "score_b" "$SCORE_B"
+          write_output "reason_b" "$REASON_B"
+
+          write_output "row_c" "$ROW_C"
+          write_output "dimension_c" "$DIMENSION_C"
+          write_output "score_c" "$SCORE_C"
+          write_output "reason_c" "$REASON_C"
+
+          write_output "row_d" "$ROW_D"
+          write_output "dimension_d" "$DIMENSION_D"
+          write_output "score_d" "$SCORE_D"
+          write_output "reason_d" "$REASON_D"
+
+          write_output "row_e" "$ROW_E"
+          write_output "dimension_e" "$DIMENSION_E"
+          write_output "score_e" "$SCORE_E"
+          write_output "reason_e" "$REASON_E"
+
+          write_output "row_f" "$ROW_F"
+          write_output "dimension_f" "$DIMENSION_F"
+          write_output "score_f" "$SCORE_F"
+          write_output "reason_f" "$REASON_F"
+
+          echo "✅ Đã đọc dữ liệu CV"
+          echo "Ứng viên: ${HO_TEN:-Không có tên}"
+          echo "Vị trí: $POSITION"
+          echo "Điểm: $SCORE"
+          echo "Đánh giá: $VERDICT"
 
       - name: Get Lark access token
         id: token
@@ -84,20 +183,22 @@ jobs:
             exit 1
           fi
 
+          PAYLOAD="$(
+            jq -nc \
+              --arg app_id "$LARK_APP_ID" \
+              --arg app_secret "$LARK_APP_SECRET" \
+              '{
+                app_id: $app_id,
+                app_secret: $app_secret
+              }'
+          )"
+
           RESPONSE="$(
             curl --silent --show-error \
               --request POST \
               "https://open.larksuite.com/open-apis/auth/v3/tenant_access_token/internal" \
               --header "Content-Type: application/json; charset=utf-8" \
-              --data "$(
-                jq -nc \
-                  --arg app_id "$LARK_APP_ID" \
-                  --arg app_secret "$LARK_APP_SECRET" \
-                  '{
-                    app_id: $app_id,
-                    app_secret: $app_secret
-                  }'
-              )"
+              --data "$PAYLOAD"
           )"
 
           CODE="$(jq -r '.code // -1' <<< "$RESPONSE")"
@@ -115,30 +216,65 @@ jobs:
       - name: Send Lark Card
         env:
           LARK_TOKEN: ${{ steps.token.outputs.token }}
-          VERDICT: ${{ steps.cv.outputs.verdict }}
+
           HO_TEN: ${{ steps.cv.outputs.ho_ten }}
-          ROLE: ${{ steps.cv.outputs.role }}
+          POSITION: ${{ steps.cv.outputs.position }}
           SCORE: ${{ steps.cv.outputs.score }}
+          VERDICT: ${{ steps.cv.outputs.verdict }}
           PHONE: ${{ steps.cv.outputs.phone }}
           EMAIL: ${{ steps.cv.outputs.email }}
           OVERVIEW: ${{ steps.cv.outputs.overview }}
           CV_URL: ${{ steps.cv.outputs.url }}
 
-        shell: bash
+          ROW_A: ${{ steps.cv.outputs.row_a }}
+          DIMENSION_A: ${{ steps.cv.outputs.dimension_a }}
+          SCORE_A: ${{ steps.cv.outputs.score_a }}
+          REASON_A: ${{ steps.cv.outputs.reason_a }}
 
+          ROW_B: ${{ steps.cv.outputs.row_b }}
+          DIMENSION_B: ${{ steps.cv.outputs.dimension_b }}
+          SCORE_B: ${{ steps.cv.outputs.score_b }}
+          REASON_B: ${{ steps.cv.outputs.reason_b }}
+
+          ROW_C: ${{ steps.cv.outputs.row_c }}
+          DIMENSION_C: ${{ steps.cv.outputs.dimension_c }}
+          SCORE_C: ${{ steps.cv.outputs.score_c }}
+          REASON_C: ${{ steps.cv.outputs.reason_c }}
+
+          ROW_D: ${{ steps.cv.outputs.row_d }}
+          DIMENSION_D: ${{ steps.cv.outputs.dimension_d }}
+          SCORE_D: ${{ steps.cv.outputs.score_d }}
+          REASON_D: ${{ steps.cv.outputs.reason_d }}
+
+          ROW_E: ${{ steps.cv.outputs.row_e }}
+          DIMENSION_E: ${{ steps.cv.outputs.dimension_e }}
+          SCORE_E: ${{ steps.cv.outputs.score_e }}
+          REASON_E: ${{ steps.cv.outputs.reason_e }}
+
+          ROW_F: ${{ steps.cv.outputs.row_f }}
+          DIMENSION_F: ${{ steps.cv.outputs.dimension_f }}
+          SCORE_F: ${{ steps.cv.outputs.score_f }}
+          REASON_F: ${{ steps.cv.outputs.reason_f }}
+
+        shell: bash
         run: |
           set -euo pipefail
 
-          case "$VERDICT" in
-            "Strong")
+          if [[ -z "${LARK_TOKEN:-}" ]]; then
+            echo "❌ LARK_TOKEN đang rỗng"
+            exit 1
+          fi
+
+          case "${VERDICT,,}" in
+            "strong")
               TEMPLATE="green"
               ICON="🟢"
               ;;
-            "Considerable")
+            "consider"|"considerable")
               TEMPLATE="orange"
               ICON="🟡"
               ;;
-            "Weak")
+            "weak")
               TEMPLATE="red"
               ICON="🔴"
               ;;
@@ -153,18 +289,63 @@ jobs:
               --arg template "$TEMPLATE" \
               --arg icon "$ICON" \
               --arg ho_ten "$HO_TEN" \
-              --arg role "$ROLE" \
+              --arg position "$POSITION" \
               --arg score "$SCORE" \
               --arg verdict "$VERDICT" \
               --arg phone "$PHONE" \
               --arg email "$EMAIL" \
               --arg overview "$OVERVIEW" \
               --arg url "$CV_URL" \
+              --arg row_a "$ROW_A" \
+              --arg dimension_a "$DIMENSION_A" \
+              --arg score_a "$SCORE_A" \
+              --arg reason_a "$REASON_A" \
+              --arg row_b "$ROW_B" \
+              --arg dimension_b "$DIMENSION_B" \
+              --arg score_b "$SCORE_B" \
+              --arg reason_b "$REASON_B" \
+              --arg row_c "$ROW_C" \
+              --arg dimension_c "$DIMENSION_C" \
+              --arg score_c "$SCORE_C" \
+              --arg reason_c "$REASON_C" \
+              --arg row_d "$ROW_D" \
+              --arg dimension_d "$DIMENSION_D" \
+              --arg score_d "$SCORE_D" \
+              --arg reason_d "$REASON_D" \
+              --arg row_e "$ROW_E" \
+              --arg dimension_e "$DIMENSION_E" \
+              --arg score_e "$SCORE_E" \
+              --arg reason_e "$REASON_E" \
+              --arg row_f "$ROW_F" \
+              --arg dimension_f "$DIMENSION_F" \
+              --arg score_f "$SCORE_F" \
+              --arg reason_f "$REASON_F" \
               '
+              def value_or_default($value; $fallback):
+                if ($value | length) == 0 then $fallback else $value end;
+
+              def assessment($number; $dimension; $score; $reason):
+                {
+                  tag: "div",
+                  text: {
+                    tag: "lark_md",
+                    content: (
+                      "**" + $number + ". " +
+                      value_or_default($dimension; "Chưa có tên tiêu chí") +
+                      "**\n" +
+                      "**Điểm: " +
+                      value_or_default($score; "Chưa có dữ liệu") +
+                      "**\n\n" +
+                      value_or_default($reason; "Chưa có phần giải thích.")
+                    )
+                  }
+                };
+
               {
                 config: {
                   wide_screen_mode: true
                 },
+
                 header: {
                   template: $template,
                   title: {
@@ -172,90 +353,186 @@ jobs:
                     content: ($icon + " CV Candidate Screening")
                   }
                 },
-                elements: [
-                  {
-                    tag: "div",
-                    text: {
-                      tag: "lark_md",
-                      content: ("# 👤 " + $ho_ten)
-                    }
-                  },
-                  {
-                    tag: "div",
-                    text: {
-                      tag: "lark_md",
-                      content: ("**💼 Vị trí ứng tuyển**\n" + $role)
-                    }
-                  },
-                  {
-                    tag: "hr"
-                  },
-                  {
-                    tag: "div",
-                    fields: [
-                      {
-                        is_short: true,
-                        text: {
-                          tag: "lark_md",
-                          content: ("**⭐ Điểm**\n" + $score)
-                        }
-                      },
-                      {
-                        is_short: true,
-                        text: {
-                          tag: "lark_md",
-                          content: ("**📊 Đánh giá**\n" + $verdict)
-                        }
+
+                elements:
+                  [
+                    {
+                      tag: "div",
+                      text: {
+                        tag: "lark_md",
+                        content: (
+                          "# 👤 " +
+                          value_or_default($ho_ten; "Ứng viên chưa xác định")
+                        )
                       }
-                    ]
-                  },
-                  {
-                    tag: "div",
-                    fields: [
-                      {
-                        is_short: true,
-                        text: {
-                          tag: "lark_md",
-                          content: ("**📞 Điện thoại**\n" + $phone)
-                        }
-                      },
-                      {
-                        is_short: true,
-                        text: {
-                          tag: "lark_md",
-                          content: ("**✉️ Email**\n" + $email)
-                        }
+                    },
+
+                    {
+                      tag: "div",
+                      text: {
+                        tag: "lark_md",
+                        content: (
+                          "**💼 Vị trí ứng tuyển**\n" +
+                          value_or_default($position; "Chưa có dữ liệu")
+                        )
                       }
-                    ]
-                  },
-                  {
-                    tag: "hr"
-                  },
-                  {
-                    tag: "div",
-                    text: {
-                      tag: "lark_md",
-                      content: ("### 📝 AI Summary\n\n" + $overview)
-                    }
-                  },
-                  {
-                    tag: "hr"
-                  },
-                  {
-                    tag: "action",
-                    actions: [
-                      {
-                        tag: "button",
-                        type: "primary",
-                        text: {
-                          tag: "plain_text",
-                          content: "📄 Xem CV trên Google Drive"
+                    },
+
+                    {
+                      tag: "hr"
+                    },
+
+                    {
+                      tag: "div",
+                      fields: [
+                        {
+                          is_short: true,
+                          text: {
+                            tag: "lark_md",
+                            content: (
+                              "**⭐ Tổng điểm**\n" +
+                              value_or_default($score; "Chưa có dữ liệu")
+                            )
+                          }
                         },
-                        url: $url
+                        {
+                          is_short: true,
+                          text: {
+                            tag: "lark_md",
+                            content: (
+                              "**📊 Đánh giá**\n" +
+                              value_or_default($verdict; "Chưa có dữ liệu")
+                            )
+                          }
+                        }
+                      ]
+                    },
+
+                    {
+                      tag: "div",
+                      fields: [
+                        {
+                          is_short: true,
+                          text: {
+                            tag: "lark_md",
+                            content: (
+                              "**📞 Điện thoại**\n" +
+                              value_or_default($phone; "Không có dữ liệu")
+                            )
+                          }
+                        },
+                        {
+                          is_short: true,
+                          text: {
+                            tag: "lark_md",
+                            content: (
+                              "**✉️ Email**\n" +
+                              value_or_default($email; "Không có dữ liệu")
+                            )
+                          }
+                        }
+                      ]
+                    },
+
+                    {
+                      tag: "hr"
+                    },
+
+                    {
+                      tag: "div",
+                      text: {
+                        tag: "lark_md",
+                        content: (
+                          "### 📝 AI Summary\n\n" +
+                          value_or_default(
+                            $overview;
+                            "Chưa có phần tổng quan ứng viên."
+                          )
+                        )
                       }
-                    ]
-                  }
-                ]
+                    },
+
+                    {
+                      tag: "hr"
+                    },
+
+                    {
+                      tag: "div",
+                      text: {
+                        tag: "lark_md",
+                        content: "### 📋 Chi tiết đánh giá"
+                      }
+                    },
+
+                    assessment(
+                      value_or_default($row_a; "1");
+                      $dimension_a;
+                      $score_a;
+                      $reason_a
+                    ),
+
+                    assessment(
+                      value_or_default($row_b; "2");
+                      $dimension_b;
+                      $score_b;
+                      $reason_b
+                    ),
+
+                    assessment(
+                      value_or_default($row_c; "3");
+                      $dimension_c;
+                      $score_c;
+                      $reason_c
+                    ),
+
+                    assessment(
+                      value_or_default($row_d; "4");
+                      $dimension_d;
+                      $score_d;
+                      $reason_d
+                    ),
+
+                    assessment(
+                      value_or_default($row_e; "5");
+                      $dimension_e;
+                      $score_e;
+                      $reason_e
+                    ),
+
+                    assessment(
+                      value_or_default($row_f; "6");
+                      $dimension_f;
+                      $score_f;
+                      $reason_f
+                    ),
+
+                    {
+                      tag: "hr"
+                    }
+                  ]
+                  +
+                  (
+                    if ($url | length) > 0 then
+                      [
+                        {
+                          tag: "action",
+                          actions: [
+                            {
+                              tag: "button",
+                              type: "primary",
+                              text: {
+                                tag: "plain_text",
+                                content: "📄 Xem CV trên Google Drive"
+                              },
+                              url: $url
+                            }
+                          ]
+                        }
+                      ]
+                    else
+                      []
+                    end
+                  )
               }
               '
           )"
@@ -301,8 +578,8 @@ jobs:
           done
 
           if [[ "$FAIL" -eq 1 ]]; then
-            echo "❌ One or more notifications failed."
+            echo "❌ One or more notifications failed"
             exit 1
           fi
 
-          echo "🎉 All notifications sent successfully."
+          echo "🎉 All notifications sent successfully"
