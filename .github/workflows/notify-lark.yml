@@ -1,173 +1,200 @@
-- name: Send Lark Card
-  run: |
-    VERDICT="${{ steps.cv.outputs.verdict }}"
+name: Notify Lark
 
-    if [ "$VERDICT" = "Strong" ]; then
-      TEMPLATE="green"
-      ICON="🟢"
-    elif [ "$VERDICT" = "Considerable" ]; then
-      TEMPLATE="orange"
-      ICON="🟡"
-    else
-      TEMPLATE="red"
-      ICON="🔴"
-    fi
+on:
+  workflow_dispatch:
 
-    CARD=$(jq -n \
-      --arg template "$TEMPLATE" \
-      --arg icon "$ICON" \
-      --arg ho_ten "${{ steps.cv.outputs.ho_ten }}" \
-      --arg role "${{ steps.cv.outputs.role }}" \
-      --arg score "${{ steps.cv.outputs.score }}" \
-      --arg verdict "${{ steps.cv.outputs.verdict }}" \
-      --arg phone "${{ steps.cv.outputs.phone }}" \
-      --arg email "${{ steps.cv.outputs.email }}" \
-      --arg overview "${{ steps.cv.outputs.overview }}" \
-      --arg url "${{ steps.cv.outputs.url }}" \
-      '
-      {
-        config: {
-          wide_screen_mode: true
-        },
+jobs:
+  send-lark-card:
+    runs-on: ubuntu-latest
 
-        header: {
-          template: $template,
-          title: {
-            tag: "plain_text",
-            content: ($icon + " CV Candidate Screening")
-          }
-        },
+    steps:
+      - name: Send Lark Card
+        env:
+          LARK_TOKEN: ${{ steps.token.outputs.token }}
+          VERDICT: ${{ steps.cv.outputs.verdict }}
+          HO_TEN: ${{ steps.cv.outputs.ho_ten }}
+          ROLE: ${{ steps.cv.outputs.role }}
+          SCORE: ${{ steps.cv.outputs.score }}
+          PHONE: ${{ steps.cv.outputs.phone }}
+          EMAIL: ${{ steps.cv.outputs.email }}
+          OVERVIEW: ${{ steps.cv.outputs.overview }}
+          CV_URL: ${{ steps.cv.outputs.url }}
 
-        elements: [
+        shell: bash
 
-          {
-            tag: "div",
-            text: {
-              tag: "lark_md",
-              content: ("# 👤 " + $ho_ten)
-            }
-          },
+        run: |
+          set -euo pipefail
 
-          {
-            tag: "div",
-            text: {
-              tag: "lark_md",
-              content: ("**💼 Vị trí ứng tuyển**\n" + $role)
-            }
-          },
+          case "$VERDICT" in
+            "Strong")
+              TEMPLATE="green"
+              ICON="🟢"
+              ;;
+            "Considerable")
+              TEMPLATE="orange"
+              ICON="🟡"
+              ;;
+            *)
+              TEMPLATE="red"
+              ICON="🔴"
+              ;;
+          esac
 
-          {
-            tag: "hr"
-          },
-
-          {
-            tag: "div",
-            fields: [
+          CARD="$(
+            jq -nc \
+              --arg template "$TEMPLATE" \
+              --arg icon "$ICON" \
+              --arg ho_ten "$HO_TEN" \
+              --arg role "$ROLE" \
+              --arg score "$SCORE" \
+              --arg verdict "$VERDICT" \
+              --arg phone "$PHONE" \
+              --arg email "$EMAIL" \
+              --arg overview "$OVERVIEW" \
+              --arg url "$CV_URL" \
+              '
               {
-                is_short: true,
-                text: {
-                  tag: "lark_md",
-                  content: ("**⭐ Điểm**\n" + $score)
-                }
-              },
-              {
-                is_short: true,
-                text: {
-                  tag: "lark_md",
-                  content: ("**📊 Đánh giá**\n" + $verdict)
-                }
-              }
-            ]
-          },
-
-          {
-            tag: "div",
-            fields: [
-              {
-                is_short: true,
-                text: {
-                  tag: "lark_md",
-                  content: ("**📞 Điện thoại**\n" + $phone)
-                }
-              },
-              {
-                is_short: true,
-                text: {
-                  tag: "lark_md",
-                  content: ("**✉️ Email**\n" + $email)
-                }
-              }
-            ]
-          },
-
-          {
-            tag: "hr"
-          },
-
-          {
-            tag: "div",
-            text: {
-              tag: "lark_md",
-              content: ("### 📝 AI Summary\n\n" + $overview)
-            }
-          },
-
-          {
-            tag: "hr"
-          },
-
-          {
-            tag: "action",
-            actions: [
-              {
-                tag: "button",
-                type: "primary",
-                text: {
-                  tag: "plain_text",
-                  content: "📄 Xem CV trên Google Drive"
+                config: {
+                  wide_screen_mode: true
                 },
-                url: $url
+                header: {
+                  template: $template,
+                  title: {
+                    tag: "plain_text",
+                    content: ($icon + " CV Candidate Screening")
+                  }
+                },
+                elements: [
+                  {
+                    tag: "div",
+                    text: {
+                      tag: "lark_md",
+                      content: ("# 👤 " + $ho_ten)
+                    }
+                  },
+                  {
+                    tag: "div",
+                    text: {
+                      tag: "lark_md",
+                      content: ("**💼 Vị trí ứng tuyển**\n" + $role)
+                    }
+                  },
+                  {
+                    tag: "hr"
+                  },
+                  {
+                    tag: "div",
+                    fields: [
+                      {
+                        is_short: true,
+                        text: {
+                          tag: "lark_md",
+                          content: ("**⭐ Điểm**\n" + $score)
+                        }
+                      },
+                      {
+                        is_short: true,
+                        text: {
+                          tag: "lark_md",
+                          content: ("**📊 Đánh giá**\n" + $verdict)
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    tag: "div",
+                    fields: [
+                      {
+                        is_short: true,
+                        text: {
+                          tag: "lark_md",
+                          content: ("**📞 Điện thoại**\n" + $phone)
+                        }
+                      },
+                      {
+                        is_short: true,
+                        text: {
+                          tag: "lark_md",
+                          content: ("**✉️ Email**\n" + $email)
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    tag: "hr"
+                  },
+                  {
+                    tag: "div",
+                    text: {
+                      tag: "lark_md",
+                      content: ("### 📝 AI Summary\n\n" + $overview)
+                    }
+                  },
+                  {
+                    tag: "hr"
+                  },
+                  {
+                    tag: "action",
+                    actions: [
+                      {
+                        tag: "button",
+                        type: "primary",
+                        text: {
+                          tag: "plain_text",
+                          content: "📄 Xem CV trên Google Drive"
+                        },
+                        url: $url
+                      }
+                    ]
+                  }
+                ]
               }
-            ]
-          }
+              '
+          )"
 
-        ]
-      }')
+          RECEIVERS=(
+            "ou_f77cf794a1319628941dd689ecc97e32"
+            "ou_4eb96bd84a22b6511fcb316d35ded621"
+            "ou_9f7de713af63322b36ee7e41f5731313"
+          )
 
-    RECEIVERS="ou_f77cf794a1319628941dd689ecc97e32 ou_4eb96bd84a22b6511fcb316d35ded621 ou_9f7de713af63322b36ee7e41f5731313"
+          FAIL=0
 
-    FAIL=0
+          for RID in "${RECEIVERS[@]}"; do
+            PAYLOAD="$(
+              jq -nc \
+                --arg rid "$RID" \
+                --arg card "$CARD" \
+                '{
+                  receive_id: $rid,
+                  msg_type: "interactive",
+                  content: $card
+                }'
+            )"
 
-    for RID in $RECEIVERS; do
+            RESP="$(
+              curl --silent --show-error \
+                --request POST \
+                "https://open.larksuite.com/open-apis/im/v1/messages?receive_id_type=open_id" \
+                --header "Authorization: Bearer $LARK_TOKEN" \
+                --header "Content-Type: application/json; charset=utf-8" \
+                --data "$PAYLOAD"
+            )"
 
-      RESP=$(curl -s -X POST \
-        "https://open.larksuite.com/open-apis/im/v1/messages?receive_id_type=open_id" \
-        -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
-        -H "Content-Type: application/json; charset=utf-8" \
-        -d "$(jq -n \
-            --arg rid "$RID" \
-            --arg card "$CARD" \
-            '{
-              receive_id: $rid,
-              msg_type: "interactive",
-              content: $card
-            }'
-        )")
+            CODE="$(jq -r '.code // -1' <<< "$RESP")"
 
-      CODE=$(echo "$RESP" | jq -r '.code')
+            if [[ "$CODE" == "0" ]]; then
+              echo "✅ Sent to $RID"
+            else
+              echo "❌ Failed to $RID"
+              echo "$RESP" | jq . || echo "$RESP"
+              FAIL=1
+            fi
+          done
 
-      if [ "$CODE" = "0" ]; then
-        echo "✅ Sent to $RID"
-      else
-        echo "❌ Failed to $RID"
-        echo "$RESP"
-        FAIL=1
-      fi
+          if [[ "$FAIL" -eq 1 ]]; then
+            echo "❌ One or more notifications failed."
+            exit 1
+          fi
 
-    done
-
-    if [ "$FAIL" = "1" ]; then
-      exit 1
-    fi
-
-    echo "🎉 All notifications sent successfully."
+          echo "🎉 All notifications sent successfully."
