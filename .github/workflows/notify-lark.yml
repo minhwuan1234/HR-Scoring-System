@@ -26,18 +26,18 @@ jobs:
           FILE="cv/latest.json"
 
           if [[ ! -f "$FILE" ]]; then
-            echo "❌ Không tìm thấy file $FILE"
+            echo "❌ Không tìm thấy file: $FILE"
             exit 1
           fi
 
-          if ! jq empty "$FILE"; then
+          if ! jq empty "$FILE" >/dev/null 2>&1; then
             echo "❌ File $FILE không phải JSON hợp lệ"
             exit 1
           fi
 
-          DATA_TYPE="$(jq -r 'type' "$FILE")"
+          JSON_TYPE="$(jq -r 'type' "$FILE")"
 
-          if [[ "$DATA_TYPE" == "array" ]]; then
+          if [[ "$JSON_TYPE" == "array" ]]; then
             ITEM_COUNT="$(jq 'length' "$FILE")"
 
             if [[ "$ITEM_COUNT" -eq 0 ]]; then
@@ -45,52 +45,57 @@ jobs:
               exit 1
             fi
 
-            ROOT='.[0]'
-          elif [[ "$DATA_TYPE" == "object" ]]; then
-            ROOT='.'
+            DATA="$(jq -c '.[0]' "$FILE")"
+
+          elif [[ "$JSON_TYPE" == "object" ]]; then
+            DATA="$(jq -c '.' "$FILE")"
+
           else
             echo "❌ JSON phải là object hoặc array chứa object"
             exit 1
           fi
 
-          HO_TEN="$(jq -r "$ROOT.ho_ten // $ROOT.name // empty" "$FILE")"
-          POSITION="$(jq -r "$ROOT.position // $ROOT.role // empty" "$FILE")"
-          SCORE="$(jq -r "$ROOT.total_score_display // $ROOT.score // empty" "$FILE")"
-          VERDICT="$(jq -r "$ROOT.overall_verdict // $ROOT.verdict // empty" "$FILE")"
-          PHONE="$(jq -r "$ROOT.so_dien_thoai // $ROOT.phone // empty" "$FILE")"
-          EMAIL="$(jq -r "$ROOT.email // empty" "$FILE")"
-          OVERVIEW="$(jq -r "$ROOT.overview // empty" "$FILE")"
-          CV_URL="$(jq -r "$ROOT.URL // $ROOT.url // empty" "$FILE")"
+          HO_TEN="$(jq -r '.ho_ten // .name // empty' <<< "$DATA")"
+          PHONE="$(jq -r '.so_dien_thoai // .phone // empty' <<< "$DATA")"
+          EMAIL="$(jq -r '.email // empty' <<< "$DATA")"
 
-          ROW_A="$(jq -r "$ROOT.row_number_a // empty" "$FILE")"
-          DIMENSION_A="$(jq -r "$ROOT.dimension_a // empty" "$FILE")"
-          SCORE_A="$(jq -r "$ROOT.score_display_a // empty" "$FILE")"
-          REASON_A="$(jq -r "$ROOT.reason_a // empty" "$FILE")"
+          POSITION="$(jq -r '.position // .role // empty' <<< "$DATA")"
+          SCORE="$(jq -r '.total_score_display // .score // empty' <<< "$DATA")"
+          VERDICT="$(jq -r '.overall_verdict // .verdict // empty' <<< "$DATA")"
 
-          ROW_B="$(jq -r "$ROOT.row_number_b // empty" "$FILE")"
-          DIMENSION_B="$(jq -r "$ROOT.dimension_b // empty" "$FILE")"
-          SCORE_B="$(jq -r "$ROOT.score_display_b // empty" "$FILE")"
-          REASON_B="$(jq -r "$ROOT.reason_b // empty" "$FILE")"
+          CV_URL="$(
+            jq -r '.URL // .url // empty' <<< "$DATA" |
+            sed 's/[[:space:]]*$//'
+          )"
 
-          ROW_C="$(jq -r "$ROOT.row_number_c // empty" "$FILE")"
-          DIMENSION_C="$(jq -r "$ROOT.dimension_c // empty" "$FILE")"
-          SCORE_C="$(jq -r "$ROOT.score_display_c // empty" "$FILE")"
-          REASON_C="$(jq -r "$ROOT.reason_c // empty" "$FILE")"
+          DIMENSION_A="$(jq -r '.dimension_a // empty' <<< "$DATA")"
+          SCORE_A="$(jq -r '.score_display_a // empty' <<< "$DATA")"
+          REASON_A="$(jq -r '.reason_a // empty' <<< "$DATA")"
 
-          ROW_D="$(jq -r "$ROOT.row_number_d // empty" "$FILE")"
-          DIMENSION_D="$(jq -r "$ROOT.dimension_d // empty" "$FILE")"
-          SCORE_D="$(jq -r "$ROOT.score_display_d // empty" "$FILE")"
-          REASON_D="$(jq -r "$ROOT.reason_d // empty" "$FILE")"
+          DIMENSION_B="$(jq -r '.dimension_b // empty' <<< "$DATA")"
+          SCORE_B="$(jq -r '.score_display_b // empty' <<< "$DATA")"
+          REASON_B="$(jq -r '.reason_b // empty' <<< "$DATA")"
 
-          ROW_E="$(jq -r "$ROOT.row_number_e // empty" "$FILE")"
-          DIMENSION_E="$(jq -r "$ROOT.dimension_e // empty" "$FILE")"
-          SCORE_E="$(jq -r "$ROOT.score_display_e // empty" "$FILE")"
-          REASON_E="$(jq -r "$ROOT.reason_e // empty" "$FILE")"
+          DIMENSION_C="$(jq -r '.dimension_c // empty' <<< "$DATA")"
+          SCORE_C="$(jq -r '.score_display_c // empty' <<< "$DATA")"
+          REASON_C="$(jq -r '.reason_c // empty' <<< "$DATA")"
 
-          ROW_F="$(jq -r "$ROOT.row_number_f // empty" "$FILE")"
-          DIMENSION_F="$(jq -r "$ROOT.dimension_f // empty" "$FILE")"
-          SCORE_F="$(jq -r "$ROOT.score_display_f // empty" "$FILE")"
-          REASON_F="$(jq -r "$ROOT.reason_f // empty" "$FILE")"
+          DIMENSION_D="$(jq -r '.dimension_d // empty' <<< "$DATA")"
+          SCORE_D="$(jq -r '.score_display_d // empty' <<< "$DATA")"
+          REASON_D="$(jq -r '.reason_d // empty' <<< "$DATA")"
+
+          DIMENSION_E="$(jq -r '.dimension_e // empty' <<< "$DATA")"
+          SCORE_E="$(jq -r '.score_display_e // empty' <<< "$DATA")"
+          REASON_E="$(jq -r '.reason_e // empty' <<< "$DATA")"
+
+          DIMENSION_F="$(jq -r '.dimension_f // empty' <<< "$DATA")"
+          SCORE_F="$(jq -r '.score_display_f // empty' <<< "$DATA")"
+          REASON_F="$(jq -r '.reason_f // empty' <<< "$DATA")"
+
+          if [[ -z "$HO_TEN" ]]; then
+            echo "❌ Thiếu trường ho_ten"
+            exit 1
+          fi
 
           if [[ -z "$POSITION" ]]; then
             echo "❌ Thiếu trường position hoặc role"
@@ -120,46 +125,39 @@ jobs:
           }
 
           write_output "ho_ten" "$HO_TEN"
+          write_output "phone" "$PHONE"
+          write_output "email" "$EMAIL"
           write_output "position" "$POSITION"
           write_output "score" "$SCORE"
           write_output "verdict" "$VERDICT"
-          write_output "phone" "$PHONE"
-          write_output "email" "$EMAIL"
-          write_output "overview" "$OVERVIEW"
           write_output "url" "$CV_URL"
 
-          write_output "row_a" "$ROW_A"
           write_output "dimension_a" "$DIMENSION_A"
           write_output "score_a" "$SCORE_A"
           write_output "reason_a" "$REASON_A"
 
-          write_output "row_b" "$ROW_B"
           write_output "dimension_b" "$DIMENSION_B"
           write_output "score_b" "$SCORE_B"
           write_output "reason_b" "$REASON_B"
 
-          write_output "row_c" "$ROW_C"
           write_output "dimension_c" "$DIMENSION_C"
           write_output "score_c" "$SCORE_C"
           write_output "reason_c" "$REASON_C"
 
-          write_output "row_d" "$ROW_D"
           write_output "dimension_d" "$DIMENSION_D"
           write_output "score_d" "$SCORE_D"
           write_output "reason_d" "$REASON_D"
 
-          write_output "row_e" "$ROW_E"
           write_output "dimension_e" "$DIMENSION_E"
           write_output "score_e" "$SCORE_E"
           write_output "reason_e" "$REASON_E"
 
-          write_output "row_f" "$ROW_F"
           write_output "dimension_f" "$DIMENSION_F"
           write_output "score_f" "$SCORE_F"
           write_output "reason_f" "$REASON_F"
 
-          echo "✅ Đã đọc dữ liệu CV"
-          echo "Ứng viên: ${HO_TEN:-Không có tên}"
+          echo "✅ Đọc dữ liệu CV thành công"
+          echo "Ứng viên: $HO_TEN"
           echo "Vị trí: $POSITION"
           echo "Điểm: $SCORE"
           echo "Đánh giá: $VERDICT"
@@ -183,7 +181,7 @@ jobs:
             exit 1
           fi
 
-          PAYLOAD="$(
+          TOKEN_PAYLOAD="$(
             jq -nc \
               --arg app_id "$LARK_APP_ID" \
               --arg app_secret "$LARK_APP_SECRET" \
@@ -198,7 +196,7 @@ jobs:
               --request POST \
               "https://open.larksuite.com/open-apis/auth/v3/tenant_access_token/internal" \
               --header "Content-Type: application/json; charset=utf-8" \
-              --data "$PAYLOAD"
+              --data "$TOKEN_PAYLOAD"
           )"
 
           CODE="$(jq -r '.code // -1' <<< "$RESPONSE")"
@@ -218,40 +216,33 @@ jobs:
           LARK_TOKEN: ${{ steps.token.outputs.token }}
 
           HO_TEN: ${{ steps.cv.outputs.ho_ten }}
+          PHONE: ${{ steps.cv.outputs.phone }}
+          EMAIL: ${{ steps.cv.outputs.email }}
           POSITION: ${{ steps.cv.outputs.position }}
           SCORE: ${{ steps.cv.outputs.score }}
           VERDICT: ${{ steps.cv.outputs.verdict }}
-          PHONE: ${{ steps.cv.outputs.phone }}
-          EMAIL: ${{ steps.cv.outputs.email }}
-          OVERVIEW: ${{ steps.cv.outputs.overview }}
           CV_URL: ${{ steps.cv.outputs.url }}
 
-          ROW_A: ${{ steps.cv.outputs.row_a }}
           DIMENSION_A: ${{ steps.cv.outputs.dimension_a }}
           SCORE_A: ${{ steps.cv.outputs.score_a }}
           REASON_A: ${{ steps.cv.outputs.reason_a }}
 
-          ROW_B: ${{ steps.cv.outputs.row_b }}
           DIMENSION_B: ${{ steps.cv.outputs.dimension_b }}
           SCORE_B: ${{ steps.cv.outputs.score_b }}
           REASON_B: ${{ steps.cv.outputs.reason_b }}
 
-          ROW_C: ${{ steps.cv.outputs.row_c }}
           DIMENSION_C: ${{ steps.cv.outputs.dimension_c }}
           SCORE_C: ${{ steps.cv.outputs.score_c }}
           REASON_C: ${{ steps.cv.outputs.reason_c }}
 
-          ROW_D: ${{ steps.cv.outputs.row_d }}
           DIMENSION_D: ${{ steps.cv.outputs.dimension_d }}
           SCORE_D: ${{ steps.cv.outputs.score_d }}
           REASON_D: ${{ steps.cv.outputs.reason_d }}
 
-          ROW_E: ${{ steps.cv.outputs.row_e }}
           DIMENSION_E: ${{ steps.cv.outputs.dimension_e }}
           SCORE_E: ${{ steps.cv.outputs.score_e }}
           REASON_E: ${{ steps.cv.outputs.reason_e }}
 
-          ROW_F: ${{ steps.cv.outputs.row_f }}
           DIMENSION_F: ${{ steps.cv.outputs.dimension_f }}
           SCORE_F: ${{ steps.cv.outputs.score_f }}
           REASON_F: ${{ steps.cv.outputs.reason_f }}
@@ -289,40 +280,37 @@ jobs:
               --arg template "$TEMPLATE" \
               --arg icon "$ICON" \
               --arg ho_ten "$HO_TEN" \
+              --arg phone "$PHONE" \
+              --arg email "$EMAIL" \
               --arg position "$POSITION" \
               --arg score "$SCORE" \
               --arg verdict "$VERDICT" \
-              --arg phone "$PHONE" \
-              --arg email "$EMAIL" \
-              --arg overview "$OVERVIEW" \
               --arg url "$CV_URL" \
-              --arg row_a "$ROW_A" \
               --arg dimension_a "$DIMENSION_A" \
               --arg score_a "$SCORE_A" \
               --arg reason_a "$REASON_A" \
-              --arg row_b "$ROW_B" \
               --arg dimension_b "$DIMENSION_B" \
               --arg score_b "$SCORE_B" \
               --arg reason_b "$REASON_B" \
-              --arg row_c "$ROW_C" \
               --arg dimension_c "$DIMENSION_C" \
               --arg score_c "$SCORE_C" \
               --arg reason_c "$REASON_C" \
-              --arg row_d "$ROW_D" \
               --arg dimension_d "$DIMENSION_D" \
               --arg score_d "$SCORE_D" \
               --arg reason_d "$REASON_D" \
-              --arg row_e "$ROW_E" \
               --arg dimension_e "$DIMENSION_E" \
               --arg score_e "$SCORE_E" \
               --arg reason_e "$REASON_E" \
-              --arg row_f "$ROW_F" \
               --arg dimension_f "$DIMENSION_F" \
               --arg score_f "$SCORE_F" \
               --arg reason_f "$REASON_F" \
               '
-              def value_or_default($value; $fallback):
-                if ($value | length) == 0 then $fallback else $value end;
+              def fallback($value; $default):
+                if ($value | length) == 0 then
+                  $default
+                else
+                  $value
+                end;
 
               def assessment($number; $dimension; $score; $reason):
                 {
@@ -331,12 +319,12 @@ jobs:
                     tag: "lark_md",
                     content: (
                       "**" + $number + ". " +
-                      value_or_default($dimension; "Chưa có tên tiêu chí") +
-                      "**\n" +
-                      "**Điểm: " +
-                      value_or_default($score; "Chưa có dữ liệu") +
+                      fallback($dimension; "Chưa có tên tiêu chí") +
                       "**\n\n" +
-                      value_or_default($reason; "Chưa có phần giải thích.")
+                      "**Điểm: " +
+                      fallback($score; "Chưa có dữ liệu") +
+                      "**\n\n" +
+                      fallback($reason; "Chưa có phần giải thích.")
                     )
                   }
                 };
@@ -362,7 +350,7 @@ jobs:
                         tag: "lark_md",
                         content: (
                           "# 👤 " +
-                          value_or_default($ho_ten; "Ứng viên chưa xác định")
+                          fallback($ho_ten; "Ứng viên chưa xác định")
                         )
                       }
                     },
@@ -373,7 +361,7 @@ jobs:
                         tag: "lark_md",
                         content: (
                           "**💼 Vị trí ứng tuyển**\n" +
-                          value_or_default($position; "Chưa có dữ liệu")
+                          fallback($position; "Chưa có dữ liệu")
                         )
                       }
                     },
@@ -391,7 +379,7 @@ jobs:
                             tag: "lark_md",
                             content: (
                               "**⭐ Tổng điểm**\n" +
-                              value_or_default($score; "Chưa có dữ liệu")
+                              fallback($score; "Chưa có dữ liệu")
                             )
                           }
                         },
@@ -401,7 +389,7 @@ jobs:
                             tag: "lark_md",
                             content: (
                               "**📊 Đánh giá**\n" +
-                              value_or_default($verdict; "Chưa có dữ liệu")
+                              fallback($verdict; "Chưa có dữ liệu")
                             )
                           }
                         }
@@ -417,7 +405,7 @@ jobs:
                             tag: "lark_md",
                             content: (
                               "**📞 Điện thoại**\n" +
-                              value_or_default($phone; "Không có dữ liệu")
+                              fallback($phone; "Không có dữ liệu")
                             )
                           }
                         },
@@ -427,29 +415,11 @@ jobs:
                             tag: "lark_md",
                             content: (
                               "**✉️ Email**\n" +
-                              value_or_default($email; "Không có dữ liệu")
+                              fallback($email; "Không có dữ liệu")
                             )
                           }
                         }
                       ]
-                    },
-
-                    {
-                      tag: "hr"
-                    },
-
-                    {
-                      tag: "div",
-                      text: {
-                        tag: "lark_md",
-                        content: (
-                          "### 📝 AI Summary\n\n" +
-                          value_or_default(
-                            $overview;
-                            "Chưa có phần tổng quan ứng viên."
-                          )
-                        )
-                      }
                     },
 
                     {
@@ -465,42 +435,42 @@ jobs:
                     },
 
                     assessment(
-                      value_or_default($row_a; "1");
+                      "1";
                       $dimension_a;
                       $score_a;
                       $reason_a
                     ),
 
                     assessment(
-                      value_or_default($row_b; "2");
+                      "2";
                       $dimension_b;
                       $score_b;
                       $reason_b
                     ),
 
                     assessment(
-                      value_or_default($row_c; "3");
+                      "3";
                       $dimension_c;
                       $score_c;
                       $reason_c
                     ),
 
                     assessment(
-                      value_or_default($row_d; "4");
+                      "4";
                       $dimension_d;
                       $score_d;
                       $reason_d
                     ),
 
                     assessment(
-                      value_or_default($row_e; "5");
+                      "5";
                       $dimension_e;
                       $score_e;
                       $reason_e
                     ),
 
                     assessment(
-                      value_or_default($row_f; "6");
+                      "6";
                       $dimension_f;
                       $score_f;
                       $reason_f
@@ -544,7 +514,7 @@ jobs:
           FAIL=0
 
           for RID in "${RECEIVERS[@]}"; do
-            PAYLOAD="$(
+            MESSAGE_PAYLOAD="$(
               jq -nc \
                 --arg rid "$RID" \
                 --arg card "$CARD" \
@@ -561,7 +531,7 @@ jobs:
                 "https://open.larksuite.com/open-apis/im/v1/messages?receive_id_type=open_id" \
                 --header "Authorization: Bearer $LARK_TOKEN" \
                 --header "Content-Type: application/json; charset=utf-8" \
-                --data "$PAYLOAD"
+                --data "$MESSAGE_PAYLOAD"
             )"
 
             CODE="$(jq -r '.code // -1' <<< "$RESPONSE")"
