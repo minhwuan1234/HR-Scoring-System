@@ -8,22 +8,63 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Get Lark Access Token
+        id: token
+        env:
+          LARK_APP_ID: ${{ secrets.LARK_APP_ID }}
+          LARK_APP_SECRET: ${{ secrets.LARK_APP_SECRET }}
+        run: |
+          set -euo pipefail
+
+          RESPONSE="$(
+            curl --silent --show-error \
+              --request POST \
+              "https://open.larksuite.com/open-apis/auth/v3/tenant_access_token/internal" \
+              --header "Content-Type: application/json; charset=utf-8" \
+              --data "$(jq -nc \
+                --arg app_id "$LARK_APP_ID" \
+                --arg app_secret "$LARK_APP_SECRET" \
+                '{
+                  app_id: $app_id,
+                  app_secret: $app_secret
+                }'
+              )"
+          )"
+
+          echo "$RESPONSE" | jq .
+
+          CODE="$(echo "$RESPONSE" | jq -r '.code // -1')"
+          TOKEN="$(echo "$RESPONSE" | jq -r '.tenant_access_token // empty')"
+
+          if [[ "$CODE" != "0" || -z "$TOKEN" ]]; then
+            echo "❌ Không lấy được Lark tenant access token."
+            exit 1
+          fi
+
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+
       - name: Send Lark Card
         env:
           LARK_TOKEN: ${{ steps.token.outputs.token }}
-          VERDICT: ${{ steps.cv.outputs.verdict }}
-          HO_TEN: ${{ steps.cv.outputs.ho_ten }}
-          ROLE: ${{ steps.cv.outputs.role }}
-          SCORE: ${{ steps.cv.outputs.score }}
-          PHONE: ${{ steps.cv.outputs.phone }}
-          EMAIL: ${{ steps.cv.outputs.email }}
-          OVERVIEW: ${{ steps.cv.outputs.overview }}
-          CV_URL: ${{ steps.cv.outputs.url }}
+
+          VERDICT: Strong
+          HO_TEN: Nguyễn Văn A
+          ROLE: Designer
+          SCORE: "85"
+          PHONE: "0123456789"
+          EMAIL: candidate@example.com
+          OVERVIEW: Ứng viên có kinh nghiệm phù hợp với vị trí.
+          CV_URL: https://drive.google.com/
 
         shell: bash
 
         run: |
           set -euo pipefail
+
+          if [[ -z "${LARK_TOKEN:-}" ]]; then
+            echo "❌ LARK_TOKEN đang rỗng."
+            exit 1
+          fi
 
           case "$VERDICT" in
             "Strong")
@@ -181,7 +222,7 @@ jobs:
                 --data "$PAYLOAD"
             )"
 
-            CODE="$(jq -r '.code // -1' <<< "$RESP")"
+            CODE="$(echo "$RESP" | jq -r '.code // -1')"
 
             if [[ "$CODE" == "0" ]]; then
               echo "✅ Sent to $RID"
@@ -193,7 +234,6 @@ jobs:
           done
 
           if [[ "$FAIL" -eq 1 ]]; then
-            echo "❌ One or more notifications failed."
             exit 1
           fi
 
