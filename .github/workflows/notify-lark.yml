@@ -26,7 +26,7 @@ jobs:
           FILE="cv/latest.json"
 
           if [[ ! -f "$FILE" ]]; then
-            echo "❌ Không tìm thấy file: $FILE"
+            echo "❌ Không tìm thấy file $FILE"
             exit 1
           fi
 
@@ -38,10 +38,10 @@ jobs:
           JSON_TYPE="$(jq -r 'type' "$FILE")"
 
           if [[ "$JSON_TYPE" == "array" ]]; then
-            ITEM_COUNT="$(jq 'length' "$FILE")"
+            COUNT="$(jq 'length' "$FILE")"
 
-            if [[ "$ITEM_COUNT" -eq 0 ]]; then
-              echo "❌ File $FILE là array rỗng"
+            if [[ "$COUNT" -eq 0 ]]; then
+              echo "❌ File JSON là array rỗng"
               exit 1
             fi
 
@@ -93,22 +93,22 @@ jobs:
           REASON_F="$(jq -r '.reason_f // empty' <<< "$DATA")"
 
           if [[ -z "$HO_TEN" ]]; then
-            echo "❌ Thiếu trường ho_ten"
+            echo "❌ Thiếu ho_ten"
             exit 1
           fi
 
           if [[ -z "$POSITION" ]]; then
-            echo "❌ Thiếu trường position hoặc role"
+            echo "❌ Thiếu position hoặc role"
             exit 1
           fi
 
           if [[ -z "$SCORE" ]]; then
-            echo "❌ Thiếu trường total_score_display"
+            echo "❌ Thiếu total_score_display"
             exit 1
           fi
 
           if [[ -z "$VERDICT" ]]; then
-            echo "❌ Thiếu trường overall_verdict"
+            echo "❌ Thiếu overall_verdict"
             exit 1
           fi
 
@@ -156,7 +156,7 @@ jobs:
           write_output "score_f" "$SCORE_F"
           write_output "reason_f" "$REASON_F"
 
-          echo "✅ Đọc dữ liệu CV thành công"
+          echo "✅ Đọc CV thành công"
           echo "Ứng viên: $HO_TEN"
           echo "Vị trí: $POSITION"
           echo "Điểm: $SCORE"
@@ -172,16 +172,16 @@ jobs:
           set -euo pipefail
 
           if [[ -z "${LARK_APP_ID:-}" ]]; then
-            echo "❌ Thiếu GitHub secret LARK_APP_ID"
+            echo "❌ Thiếu secret LARK_APP_ID"
             exit 1
           fi
 
           if [[ -z "${LARK_APP_SECRET:-}" ]]; then
-            echo "❌ Thiếu GitHub secret LARK_APP_SECRET"
+            echo "❌ Thiếu secret LARK_APP_SECRET"
             exit 1
           fi
 
-          TOKEN_PAYLOAD="$(
+          PAYLOAD="$(
             jq -nc \
               --arg app_id "$LARK_APP_ID" \
               --arg app_secret "$LARK_APP_SECRET" \
@@ -196,7 +196,7 @@ jobs:
               --request POST \
               "https://open.larksuite.com/open-apis/auth/v3/tenant_access_token/internal" \
               --header "Content-Type: application/json; charset=utf-8" \
-              --data "$TOKEN_PAYLOAD"
+              --data "$PAYLOAD"
           )"
 
           CODE="$(jq -r '.code // -1' <<< "$RESPONSE")"
@@ -318,7 +318,9 @@ jobs:
                   text: {
                     tag: "lark_md",
                     content: (
-                      "**" + $number + ". " +
+                      "**" +
+                      $number +
+                      ". " +
                       fallback($dimension; "Chưa có tên tiêu chí") +
                       "**\n\n" +
                       "**Điểm: " +
@@ -342,7 +344,7 @@ jobs:
                   }
                 },
 
-                elements:
+                elements: (
                   [
                     {
                       tag: "div",
@@ -503,9 +505,16 @@ jobs:
                       []
                     end
                   )
+                )
               }
               '
           )"
+
+          if ! jq empty <<< "$CARD" >/dev/null 2>&1; then
+            echo "❌ Card JSON không hợp lệ"
+            echo "$CARD"
+            exit 1
+          fi
 
           RECEIVERS=(
             "ou_f77cf794a1319628941dd689ecc97e32"
@@ -546,8 +555,8 @@ jobs:
           done
 
           if [[ "$FAIL" -eq 1 ]]; then
-            echo "❌ One or more notifications failed"
+            echo "❌ Có ít nhất một tin nhắn gửi thất bại"
             exit 1
           fi
 
-          echo "🎉 All notifications sent successfully"
+          echo "🎉 Gửi toàn bộ Lark Card thành công"
