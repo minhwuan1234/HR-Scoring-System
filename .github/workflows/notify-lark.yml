@@ -4,11 +4,12 @@ on:
   push:
     branches: [main]
     paths:
-      - 'cv/latest.json'
+      - "cv/latest.json"
 
 jobs:
   notify:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -16,15 +17,17 @@ jobs:
       - name: Read CV data
         id: cv
         run: |
-          echo "ho_ten=$(jq -r '.ho_ten' cv/latest.json)"             >> $GITHUB_OUTPUT
-          echo "role=$(jq -r '.role' cv/latest.json)"                 >> $GITHUB_OUTPUT
+          echo "ho_ten=$(jq -r '.ho_ten' cv/latest.json)" >> $GITHUB_OUTPUT
+          echo "role=$(jq -r '.role' cv/latest.json)" >> $GITHUB_OUTPUT
           echo "score=$(jq -r '.total_score_display' cv/latest.json)" >> $GITHUB_OUTPUT
-          echo "verdict=$(jq -r '.overall_verdict' cv/latest.json)"   >> $GITHUB_OUTPUT
-          echo "phone=$(jq -r '.so_dien_thoai' cv/latest.json)"       >> $GITHUB_OUTPUT
-          echo "email=$(jq -r '.email' cv/latest.json)"               >> $GITHUB_OUTPUT
-          echo "overview<<EOF"                                        >> $GITHUB_OUTPUT
-          jq -r '.overview' cv/latest.json                            >> $GITHUB_OUTPUT
-          echo "EOF"                                                  >> $GITHUB_OUTPUT
+          echo "verdict=$(jq -r '.overall_verdict' cv/latest.json)" >> $GITHUB_OUTPUT
+          echo "phone=$(jq -r '.so_dien_thoai' cv/latest.json)" >> $GITHUB_OUTPUT
+          echo "email=$(jq -r '.email' cv/latest.json)" >> $GITHUB_OUTPUT
+          echo "url=$(jq -r '.URL' cv/latest.json)" >> $GITHUB_OUTPUT
+
+          echo "overview<<EOF" >> $GITHUB_OUTPUT
+          jq -r '.overview' cv/latest.json >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Get tenant_access_token
         id: token
@@ -34,67 +37,200 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"app_id\":\"${{ secrets.LARK_APP_ID }}\",\"app_secret\":\"${{ secrets.LARK_APP_SECRET }}\"}" \
             | jq -r '.tenant_access_token')
+
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
-      - name: Send Lark card
+      - name: Send Lark Card
         run: |
+
           VERDICT="${{ steps.cv.outputs.verdict }}"
-          if [ "$VERDICT" = "Strong" ]; then TEMPLATE="green";
-          elif [ "$VERDICT" = "Considerable" ]; then TEMPLATE="orange";
-          else TEMPLATE="red"; fi
+
+          if [ "$VERDICT" = "Strong" ]; then
+            TEMPLATE="green"
+            ICON="🟢"
+          elif [ "$VERDICT" = "Considerable" ]; then
+            TEMPLATE="orange"
+            ICON="🟡"
+          else
+            TEMPLATE="red"
+            ICON="🔴"
+          fi
 
           CARD=$(jq -n \
+            --arg template "$TEMPLATE" \
+            --arg icon "$ICON" \
             --arg ho_ten "${{ steps.cv.outputs.ho_ten }}" \
             --arg role "${{ steps.cv.outputs.role }}" \
             --arg score "${{ steps.cv.outputs.score }}" \
-            --arg verdict "$VERDICT" \
+            --arg verdict "${{ steps.cv.outputs.verdict }}" \
             --arg phone "${{ steps.cv.outputs.phone }}" \
             --arg email "${{ steps.cv.outputs.email }}" \
             --arg overview "${{ steps.cv.outputs.overview }}" \
-            --arg template "$TEMPLATE" \
-            '{
-              config: { wide_screen_mode: true },
-              header: {
-                template: $template,
-                title: { tag: "plain_text", content: ("🗂 CV mới: " + $ho_ten) }
+            --arg url "${{ steps.cv.outputs.url }}" \
+            '
+            {
+              config:{
+                wide_screen_mode:true
               },
-              elements: [
-                { tag: "div", text: { tag: "lark_md",
-                  content: ("**Vị trí ứng tuyển**\n" + $role) } },
-                { tag: "hr" },
-                { tag: "div", fields: [
-                  { is_short: true, text: { tag: "lark_md", content: ("**Điểm tổng**\n" + $score) } },
-                  { is_short: true, text: { tag: "lark_md", content: ("**Đánh giá**\n" + $verdict) } }
-                ] },
-                { tag: "hr" },
-                { tag: "div", fields: [
-                  { is_short: true, text: { tag: "lark_md", content: ("**SĐT**\n" + $phone) } },
-                  { is_short: true, text: { tag: "lark_md", content: ("**Email**\n" + $email) } }
-                ] },
-                { tag: "hr" },
-                { tag: "div", text: { tag: "lark_md", content: ("**Tổng quan**\n" + $overview) } }
+
+              header:{
+                template:$template,
+                title:{
+                  tag:"plain_text",
+                  content:($icon + "  CV Candidate Screening")
+                }
+              },
+
+              elements:[
+
+                {
+                  tag:"div",
+                  text:{
+                    tag:"lark_md",
+                    content:
+                      "**👤 Ứng viên**\n" +
+                      $ho_ten
+                  }
+                },
+
+                {
+                  tag:"div",
+                  text:{
+                    tag:"lark_md",
+                    content:
+                      "**💼 Vị trí ứng tuyển**\n" +
+                      $role
+                  }
+                },
+
+                {
+                  tag:"hr"
+                },
+
+                {
+                  tag:"column_set",
+                  columns:[
+                    {
+                      width:"weighted",
+                      weight:1,
+                      elements:[
+                        {
+                          tag:"markdown",
+                          content:"### ⭐ Điểm\n"+$score
+                        }
+                      ]
+                    },
+                    {
+                      width:"weighted",
+                      weight:1,
+                      elements:[
+                        {
+                          tag:"markdown",
+                          content:"### 📊 Đánh giá\n"+$verdict
+                        }
+                      ]
+                    }
+                  ]
+                },
+
+                {
+                  tag:"hr"
+                },
+
+                {
+                  tag:"column_set",
+                  columns:[
+                    {
+                      width:"weighted",
+                      weight:1,
+                      elements:[
+                        {
+                          tag:"markdown",
+                          content:"**📞 Điện thoại**\n"+$phone
+                        }
+                      ]
+                    },
+                    {
+                      width:"weighted",
+                      weight:1,
+                      elements:[
+                        {
+                          tag:"markdown",
+                          content:"**✉️ Email**\n"+$email
+                        }
+                      ]
+                    }
+                  ]
+                },
+
+                {
+                  tag:"hr"
+                },
+
+                {
+                  tag:"div",
+                  text:{
+                    tag:"lark_md",
+                    content:
+                      "**📝 AI Summary**\n\n"+$overview
+                  }
+                },
+
+                {
+                  tag:"hr"
+                },
+
+                {
+                  tag:"action",
+                  actions:[
+                    {
+                      tag:"button",
+                      type:"primary",
+                      text:{
+                        tag:"plain_text",
+                        content:"📄 Xem CV trên Google Drive"
+                      },
+                      url:$url
+                    }
+                  ]
+                }
+
               ]
             }')
 
-          # Danh sách open_id người nhận
           RECEIVERS="ou_f77cf794a1319628941dd689ecc97e32 ou_4eb96bd84a22b6511fcb316d35ded621 ou_9f7de713af63322b36ee7e41f5731313"
 
           FAIL=0
+
           for RID in $RECEIVERS; do
+
             RESP=$(curl -s -X POST \
               "https://open.larksuite.com/open-apis/im/v1/messages?receive_id_type=open_id" \
               -H "Authorization: Bearer ${{ steps.token.outputs.token }}" \
               -H "Content-Type: application/json; charset=utf-8" \
-              -d "$(jq -n --arg rid "$RID" --arg card "$CARD" \
-                    '{receive_id: $rid, msg_type: "interactive", content: $card}')")
+              -d "$(jq -n \
+                --arg rid "$RID" \
+                --arg card "$CARD" \
+                '{
+                  receive_id:$rid,
+                  msg_type:"interactive",
+                  content:$card
+                }'
+              )")
+
             CODE=$(echo "$RESP" | jq -r '.code')
+
             if [ "$CODE" = "0" ]; then
-              echo "✅ Gửi thành công tới $RID"
+              echo "✅ Sent to $RID"
             else
-              echo "❌ Lỗi tới $RID: $RESP"
+              echo "❌ Failed: $RESP"
               FAIL=1
             fi
+
           done
 
-          if [ "$FAIL" = "1" ]; then exit 1; fi
-          echo "✅ Hoàn tất gửi cho toàn bộ người nhận"
+          if [ "$FAIL" = "1" ]; then
+            exit 1
+          fi
+
+          echo "🎉 All notifications sent successfully."
