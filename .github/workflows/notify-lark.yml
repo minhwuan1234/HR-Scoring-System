@@ -92,23 +92,19 @@ jobs:
           SCORE_F="$(jq -r '.score_display_f // empty' <<< "$DATA")"
           REASON_F="$(jq -r '.reason_f // empty' <<< "$DATA")"
 
-          if [[ -z "$HO_TEN" ]]; then
-            echo "❌ Thiếu ho_ten"
+          # Chỉ chặn workflow khi thiếu file CV hoặc thiếu toàn bộ phần đánh giá kinh nghiệm.
+          # Các trường khác như họ tên, vị trí, tổng điểm, verdict, điện thoại, email...
+          # được phép để trống và sẽ dùng fallback khi render Lark Card.
+
+          if [[ -z "$CV_URL" ]]; then
+            echo "❌ Thiếu file CV / URL CV"
             exit 1
           fi
 
-          if [[ -z "$POSITION" ]]; then
-            echo "❌ Thiếu position hoặc role"
-            exit 1
-          fi
+          ASSESSMENT_CONTENT="${DIMENSION_A}${SCORE_A}${REASON_A}${DIMENSION_B}${SCORE_B}${REASON_B}${DIMENSION_C}${SCORE_C}${REASON_C}${DIMENSION_D}${SCORE_D}${REASON_D}${DIMENSION_E}${SCORE_E}${REASON_E}${DIMENSION_F}${SCORE_F}${REASON_F}"
 
-          if [[ -z "$SCORE" ]]; then
-            echo "❌ Thiếu total_score_display"
-            exit 1
-          fi
-
-          if [[ -z "$VERDICT" ]]; then
-            echo "❌ Thiếu overall_verdict"
+          if [[ -z "${ASSESSMENT_CONTENT//[[:space:]]/}" ]]; then
+            echo "❌ Thiếu toàn bộ phần đánh giá kinh nghiệm"
             exit 1
           fi
 
