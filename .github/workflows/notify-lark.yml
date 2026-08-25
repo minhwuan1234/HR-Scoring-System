@@ -243,6 +243,9 @@ jobs:
           SCORE_F: ${{ steps.cv.outputs.score_f }}
           REASON_F: ${{ steps.cv.outputs.reason_f }}
 
+          # Thay bằng URL setup call thật của bạn.
+          SETUP_CALL_URL: "https://cal.com/f-creative-krcb9e/30min"
+
         shell: bash
         run: |
           set -euo pipefail
@@ -282,6 +285,7 @@ jobs:
               --arg score "$SCORE" \
               --arg verdict "$VERDICT" \
               --arg url "$CV_URL" \
+              --arg setup_call_url "$SETUP_CALL_URL" \
               --arg dimension_a "$DIMENSION_A" \
               --arg score_a "$SCORE_A" \
               --arg reason_a "$REASON_A" \
@@ -480,21 +484,47 @@ jobs:
                   ]
                   +
                   (
-                    if ($url | length) > 0 then
+                    if (($url | length) > 0 or ($setup_call_url | length) > 0) then
                       [
                         {
                           tag: "action",
-                          actions: [
-                            {
-                              tag: "button",
-                              type: "primary",
-                              text: {
-                                tag: "plain_text",
-                                content: "📄 Xem CV trên Google Drive"
-                              },
-                              url: $url
-                            }
-                          ]
+                          actions: (
+                            (
+                              if ($url | length) > 0 then
+                                [
+                                  {
+                                    tag: "button",
+                                    type: "primary",
+                                    text: {
+                                      tag: "plain_text",
+                                      content: "📄 Xem CV trên Google Drive"
+                                    },
+                                    url: $url
+                                  }
+                                ]
+                              else
+                                []
+                              end
+                            )
+                            +
+                            (
+                              if ($setup_call_url | length) > 0 then
+                                [
+                                  {
+                                    tag: "button",
+                                    type: "default",
+                                    text: {
+                                      tag: "plain_text",
+                                      content: "📅 Setup lịch Call"
+                                    },
+                                    url: $setup_call_url
+                                  }
+                                ]
+                              else
+                                []
+                              end
+                            )
+                          )
                         }
                       ]
                     else
