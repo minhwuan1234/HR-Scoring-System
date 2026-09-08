@@ -92,9 +92,8 @@ jobs:
           SCORE_F="$(jq -r '.score_display_f // empty' <<< "$DATA")"
           REASON_F="$(jq -r '.reason_f // empty' <<< "$DATA")"
 
-          # Chỉ chặn workflow khi thiếu file CV hoặc thiếu toàn bộ phần đánh giá kinh nghiệm.
-          # Các trường khác như họ tên, vị trí, tổng điểm, verdict, điện thoại, email...
-          # được phép để trống và sẽ dùng fallback khi render Lark Card.
+          # Các trường thông tin ứng viên được phép để trống.
+          # Bắt buộc có URL CV và ít nhất một nội dung đánh giá.
 
           if [[ -z "$CV_URL" ]]; then
             echo "❌ Thiếu file CV / URL CV"
@@ -204,6 +203,7 @@ jobs:
             exit 1
           fi
 
+          echo "::add-mask::$TOKEN"
           echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
           echo "✅ Đã lấy Lark access token"
 
@@ -243,7 +243,6 @@ jobs:
           SCORE_F: ${{ steps.cv.outputs.score_f }}
           REASON_F: ${{ steps.cv.outputs.reason_f }}
 
-          # Thay bằng URL setup call thật của bạn.
           SETUP_CALL_URL: "https://cal.com/f-creative-krcb9e/30min"
 
         shell: bash
@@ -273,6 +272,13 @@ jobs:
               ICON="⚪"
               ;;
           esac
+
+          # Nút gửi bài test dùng callback của Lark App.
+          # Cấu hình Request URL trong Lark Developer Console:
+          # https://n8n.tonytran.design/webhook/6af26a40-57a2-4a4f-af3d-b6664091a583
+          #
+          # Callback cần đăng ký: card.action.trigger
+          # Dữ liệu của nút nằm trong event.action.value.
 
           CARD="$(
             jq -nc \
@@ -344,194 +350,218 @@ jobs:
                   }
                 },
 
-                elements: (
-                  [
-                    {
-                      tag: "div",
-                      text: {
-                        tag: "lark_md",
-                        content: (
-                          "# 👤 " +
-                          fallback($ho_ten; "Ứng viên chưa xác định")
-                        )
-                      }
-                    },
-
-                    {
-                      tag: "div",
-                      text: {
-                        tag: "lark_md",
-                        content: (
-                          "**💼 Vị trí ứng tuyển**\n" +
-                          fallback($position; "Chưa có dữ liệu")
-                        )
-                      }
-                    },
-
-                    {
-                      tag: "hr"
-                    },
-
-                    {
-                      tag: "div",
-                      fields: [
-                        {
-                          is_short: true,
-                          text: {
-                            tag: "lark_md",
-                            content: (
-                              "**⭐ Tổng điểm**\n" +
-                              fallback($score; "Chưa có dữ liệu")
-                            )
-                          }
-                        },
-                        {
-                          is_short: true,
-                          text: {
-                            tag: "lark_md",
-                            content: (
-                              "**📊 Đánh giá**\n" +
-                              fallback($verdict; "Chưa có dữ liệu")
-                            )
-                          }
-                        }
-                      ]
-                    },
-
-                    {
-                      tag: "div",
-                      fields: [
-                        {
-                          is_short: true,
-                          text: {
-                            tag: "lark_md",
-                            content: (
-                              "**📞 Điện thoại**\n" +
-                              fallback($phone; "Không có dữ liệu")
-                            )
-                          }
-                        },
-                        {
-                          is_short: true,
-                          text: {
-                            tag: "lark_md",
-                            content: (
-                              "**✉️ Email**\n" +
-                              fallback($email; "Không có dữ liệu")
-                            )
-                          }
-                        }
-                      ]
-                    },
-
-                    {
-                      tag: "hr"
-                    },
-
-                    {
-                      tag: "div",
-                      text: {
-                        tag: "lark_md",
-                        content: "### 📋 Chi tiết đánh giá"
-                      }
-                    },
-
-                    assessment(
-                      "1";
-                      $dimension_a;
-                      $score_a;
-                      $reason_a
-                    ),
-
-                    assessment(
-                      "2";
-                      $dimension_b;
-                      $score_b;
-                      $reason_b
-                    ),
-
-                    assessment(
-                      "3";
-                      $dimension_c;
-                      $score_c;
-                      $reason_c
-                    ),
-
-                    assessment(
-                      "4";
-                      $dimension_d;
-                      $score_d;
-                      $reason_d
-                    ),
-
-                    assessment(
-                      "5";
-                      $dimension_e;
-                      $score_e;
-                      $reason_e
-                    ),
-
-                    assessment(
-                      "6";
-                      $dimension_f;
-                      $score_f;
-                      $reason_f
-                    ),
-
-                    {
-                      tag: "hr"
+                elements: [
+                  {
+                    tag: "div",
+                    text: {
+                      tag: "lark_md",
+                      content: (
+                        "# 👤 " +
+                        fallback($ho_ten; "Ứng viên chưa xác định")
+                      )
                     }
-                  ]
-                  +
-                  (
-                    if (($url | length) > 0 or ($setup_call_url | length) > 0) then
-                      [
-                        {
-                          tag: "action",
-                          actions: (
-                            (
-                              if ($url | length) > 0 then
-                                [
-                                  {
-                                    tag: "button",
-                                    type: "primary",
-                                    text: {
-                                      tag: "plain_text",
-                                      content: "📄 Xem CV trên Google Drive"
-                                    },
-                                    url: $url
-                                  }
-                                ]
-                              else
-                                []
-                              end
-                            )
-                            +
-                            (
-                              if ($setup_call_url | length) > 0 then
-                                [
-                                  {
-                                    tag: "button",
-                                    type: "default",
-                                    text: {
-                                      tag: "plain_text",
-                                      content: "📅 Setup lịch Call"
-                                    },
-                                    url: $setup_call_url
-                                  }
-                                ]
-                              else
-                                []
-                              end
-                            )
+                  },
+
+                  {
+                    tag: "div",
+                    text: {
+                      tag: "lark_md",
+                      content: (
+                        "**💼 Vị trí ứng tuyển**\n" +
+                        fallback($position; "Chưa có dữ liệu")
+                      )
+                    }
+                  },
+
+                  {
+                    tag: "hr"
+                  },
+
+                  {
+                    tag: "div",
+                    fields: [
+                      {
+                        is_short: true,
+                        text: {
+                          tag: "lark_md",
+                          content: (
+                            "**⭐ Tổng điểm**\n" +
+                            fallback($score; "Chưa có dữ liệu")
                           )
                         }
+                      },
+                      {
+                        is_short: true,
+                        text: {
+                          tag: "lark_md",
+                          content: (
+                            "**📊 Đánh giá**\n" +
+                            fallback($verdict; "Chưa có dữ liệu")
+                          )
+                        }
+                      }
+                    ]
+                  },
+
+                  {
+                    tag: "div",
+                    fields: [
+                      {
+                        is_short: true,
+                        text: {
+                          tag: "lark_md",
+                          content: (
+                            "**📞 Điện thoại**\n" +
+                            fallback($phone; "Không có dữ liệu")
+                          )
+                        }
+                      },
+                      {
+                        is_short: true,
+                        text: {
+                          tag: "lark_md",
+                          content: (
+                            "**✉️ Email**\n" +
+                            fallback($email; "Không có dữ liệu")
+                          )
+                        }
+                      }
+                    ]
+                  },
+
+                  {
+                    tag: "hr"
+                  },
+
+                  {
+                    tag: "div",
+                    text: {
+                      tag: "lark_md",
+                      content: "### 📋 Chi tiết đánh giá"
+                    }
+                  },
+
+                  assessment(
+                    "1";
+                    $dimension_a;
+                    $score_a;
+                    $reason_a
+                  ),
+
+                  assessment(
+                    "2";
+                    $dimension_b;
+                    $score_b;
+                    $reason_b
+                  ),
+
+                  assessment(
+                    "3";
+                    $dimension_c;
+                    $score_c;
+                    $reason_c
+                  ),
+
+                  assessment(
+                    "4";
+                    $dimension_d;
+                    $score_d;
+                    $reason_d
+                  ),
+
+                  assessment(
+                    "5";
+                    $dimension_e;
+                    $score_e;
+                    $reason_e
+                  ),
+
+                  assessment(
+                    "6";
+                    $dimension_f;
+                    $score_f;
+                    $reason_f
+                  ),
+
+                  {
+                    tag: "hr"
+                  },
+
+                  {
+                    tag: "action",
+                    actions: (
+                      (
+                        if ($url | length) > 0 then
+                          [
+                            {
+                              tag: "button",
+                              type: "primary",
+                              text: {
+                                tag: "plain_text",
+                                content: "📄 Xem CV trên Google Drive"
+                              },
+                              url: $url
+                            }
+                          ]
+                        else
+                          []
+                        end
+                      )
+                      +
+                      (
+                        if ($setup_call_url | length) > 0 then
+                          [
+                            {
+                              tag: "button",
+                              type: "default",
+                              text: {
+                                tag: "plain_text",
+                                content: "📅 Setup lịch Call"
+                              },
+                              url: $setup_call_url
+                            }
+                          ]
+                        else
+                          []
+                        end
+                      )
+                      +
+                      [
+                        {
+                          tag: "button",
+                          type: "primary",
+                          text: {
+                            tag: "plain_text",
+                            content: "Gửi bài test qua email"
+                          },
+                          value: {
+                            action: "send_candidate_test",
+                            email: $email,
+                            candidate_name: $ho_ten,
+                            position: $position
+                          },
+                          confirm: {
+                            title: {
+                              tag: "plain_text",
+                              content: "Xác nhận gửi bài test"
+                            },
+                            text: {
+                              tag: "plain_text",
+                              content: (
+                                "Gửi yêu cầu gửi bài test cho " +
+                                fallback($ho_ten; "ứng viên chưa xác định") +
+                                " qua email " +
+                                fallback($email; "(chưa có email)") +
+                                "?\nVị trí: " +
+                                fallback($position; "Chưa có dữ liệu")
+                              )
+                            }
+                          }
+                        }
                       ]
-                    else
-                      []
-                    end
-                  )
-                )
+                    )
+                  }
+                ]
               }
               '
           )"
